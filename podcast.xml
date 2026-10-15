@@ -1,20 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+<rss version="2.0" 
+     xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"
+     xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
     <title>一級建築士 設計製図 毎日の音声解説</title>
-    <link>https://nameof-coder.github.io/my-study-podcast/</link>
+    <link>https://namekof-coder.github.io/my-study-podcast/</link>
     <language>ja</language>
     <itunes:author>AI講師 &amp; ナビゲーター</itunes:author>
     <description>実務経験を活かして一級建築士製図試験合格を目指すための、耳で聴くデイリー学習ポッドキャストです。</description>
+    <itunes:type>episodic</itunes:type>
     <itunes:explicit>no</itunes:explicit>
+    <itunes:category text="Education"/>
+    <itunes:image href="https://raw.githubusercontent.com/namekof-coder/my-study-podcast/main/cover.png"/>
 
     <!-- 最新エピソード -->
     <item>
       <title>【設備】受水槽の六面点検と断面計画</title>
+      <itunes:title>【設備】受水槽の六面点検と断面計画</itunes:title>
       <description>受水槽の上部100cm・側面60cmの離隔基準と、梁下有効高さ・機械室断面計画のポイントを解説。</description>
       <pubDate>Thu, 15 Oct 2026 07:00:00 +0900</pubDate>
-      <enclosure url="https://namekof-coder.github.io/my-study-podcast/daily_overview.wav" type="audio/wav" length="1024000"/>
-      <guid>episode-2026-10-15</guid>
+      <enclosure url="https://namekof-coder.github.io/my-study-podcast/daily_overview.wav" type="audio/x-wav" length="10240000"/>
+      <guid isPermaLink="false">episode-2026-10-15</guid>
+      <itunes:duration>180</itunes:duration>
+      <itunes:explicit>no</itunes:explicit>
     </item>
 
   </channel>
