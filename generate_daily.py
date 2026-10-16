@@ -16,7 +16,7 @@ client = genai.Client(api_key=api_key)
 FOLDER_ID = "1czW_J-e83J_FdorXYqyCJsjYuKNxD8cl"
 TARGET_DOC_NAME = "製図 音声解説ソース"
 
-print(f"① Googleドライブのフォルダ内を検索中...")
+print("① Googleドライブのフォルダ内を検索中...")
 folder_url = f"https://drive.google.com/embeddedfolderview?id={FOLDER_ID}#list"
 
 target_file_id = None
@@ -148,4 +148,19 @@ xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 
     <item>
       <title>【{today_str}】一級建築士製図 デイリー音声解説</title>
-      <itunes:title>【{today
+      <itunes:title>【{today_str}】一級建築士製図 デイリー音声解説</itunes:title>
+      <description>Googleドキュメントの最新記録に基づく本日の振り返りと重要復習ポイントです。</description>
+      <pubDate>{now_rfc}</pubDate>
+      <enclosure url="https://namekof-coder.github.io/my-study-podcast/daily_overview.mp3" type="audio/mpeg" length="{file_size}"/>
+      <guid isPermaLink="false">episode-{today_str}</guid>
+      <itunes:explicit>no</itunes:explicit>
+    </item>
+
+  </channel>
+</rss>
+"""
+
+with open("podcast.xml", "w", encoding="utf-8") as f:
+    f.write(xml_content)
+
+print("🎉 全ての処理が完了しました！")
