@@ -23,16 +23,12 @@ target_file_id = None
 try:
     res = requests.get(folder_url)
     if res.status_code == 200:
-        # フォルダ内HTMLから「製図 音声解説ソース」のIDを抽出
-        # 形式例: ['ID', '製図 音声解説ソース']
         pattern = rf'\["([a-zA-Z0-9_-]{{25,}})",\s*"{re.escape(TARGET_DOC_NAME)}"'
         match = re.search(pattern, res.text)
         if match:
             target_file_id = match.group(1)
             print(f"最新の「{TARGET_DOC_NAME}」を検出しました。")
         else:
-            print(f"完全一致する「{TARGET_DOC_NAME}」が見つかりませんでした。旧版と区別して再検索します。")
-            # 汎用検索：title属性やリンクから抽出
             alt_pattern = rf'/document/d/([a-zA-Z0-9_-]+)/edit[^>]*>{re.escape(TARGET_DOC_NAME)}<'
             alt_match = re.search(alt_pattern, res.text)
             if alt_match:
@@ -100,4 +96,56 @@ print("② Geminiが台本を作成中...")
 response = client.models.generate_content(
     model="gemini-3.8-flash",
     contents=prompt,
-    config={"response_mime_type": "application/json
+    config={"response_mime_type": "application/json"}
+)
+
+dialogue = json.loads(response.text)
+print(f"台本が完成しました（全{len(dialogue)}セリフ）")
+
+# 4. 音声合成と結合
+print("③ クラウド音声合成中...")
+combined_audio = AudioSegment.empty()
+pause = AudioSegment.silent(duration=350)
+
+for i, item in enumerate(dialogue):
+    speaker = item["speaker"]
+    text = item["text"]
+    
+    tld = "co.jp" if speaker == "Koushi" else "com"
+    tts = gTTS(text=text, lang="ja", tld=tld)
+    
+    fp = io.BytesIO()
+    tts.write_to_fp(fp)
+    fp.seek(0)
+    
+    segment = AudioSegment.from_file(fp, format="mp3")
+    combined_audio += segment + pause
+
+output_audio = "daily_overview.mp3"
+combined_audio.export(output_audio, format="mp3")
+file_size = os.path.getsize(output_audio)
+print(f"音声ファイル保存完了: {output_audio} ({file_size} bytes)")
+
+# 5. podcast.xml の自動更新
+print("④ podcast.xml を更新中...")
+today_str = datetime.date.today().strftime("%Y-%m-%d")
+now_rfc = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9))).strftime("%a, %d %b %Y %H:%M:%S +0900")
+
+xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" 
+     xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"
+     xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>一級建築士 設計製図 毎日の音声解説</title>
+    <link>https://namekof-coder.github.io/my-study-podcast/</link>
+    <language>ja</language>
+    <itunes:author>AI講師 &amp; ナビゲーター</itunes:author>
+    <description>実務経験を活かして一級建築士製図試験合格を目指すための、耳で聴くデイリー学習ポッドキャストです。</description>
+    <itunes:type>episodic</itunes:type>
+    <itunes:explicit>no</itunes:explicit>
+    <itunes:category text="Education"/>
+    <itunes:image href="https://raw.githubusercontent.com/namekof-coder/my-study-podcast/main/cover.png"/>
+
+    <item>
+      <title>【{today_str}】一級建築士製図 デイリー音声解説</title>
+      <itunes:title>【{today
