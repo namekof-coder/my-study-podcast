@@ -2,6 +2,7 @@ import os
 import json
 import io
 import re
+import time
 import datetime
 import requests
 from google import genai
@@ -12,45 +13,63 @@ from pydub import AudioSegment
 api_key = os.environ.get("GEMINI_API_KEY")
 client = genai.Client(api_key=api_key)
 
-# 2. 対象フォルダ内の「製図 音声解説ソース」を自動検索して取得
+# 2. 対象フォルダ内の「製図 音声解説ソース」を自動検索
 FOLDER_ID = "1czW_J-e83J_FdorXYqyCJsjYuKNxD8cl"
 TARGET_DOC_NAME = "製図 音声解説ソース"
 
 print("① Googleドライブのフォルダ内を検索中...")
-folder_url = f"https://drive.google.com/embeddedfolderview?id={FOLDER_ID}#list"
-
 target_file_id = None
-try:
-    res = requests.get(folder_url)
-    if res.status_code == 200:
-        pattern = rf'\["([a-zA-Z0-9_-]{{25,}})",\s*"{re.escape(TARGET_DOC_NAME)}"'
-        match = re.search(pattern, res.text)
-        if match:
-            target_file_id = match.group(1)
-            print(f"最新の「{TARGET_DOC_NAME}」を検出しました。")
-        else:
-            alt_pattern = rf'/document/d/([a-zA-Z0-9_-]+)/edit[^>]*>{re.escape(TARGET_DOC_NAME)}<'
-            alt_match = re.search(alt_pattern, res.text)
-            if alt_match:
-                target_file_id = alt_match.group(1)
-                print(f"最新の「{TARGET_DOC_NAME}」を検出しました。")
-except Exception as e:
-    print(f"フォルダ検索エラー: {e}")
+
+# Drive公開フォルダの検索エンドポイント
+folder_urls = [
+    f"https://drive.google.com/drive/folders/{FOLDER_ID}",
+    f"https://drive.google.com/embeddedfolderview?id={FOLDER_ID}#list"
+]
+
+for f_url in folder_urls:
+    try:
+        headers = {"User-Agent": "Mozilla/5.0"}
+        res = requests.get(f_url, headers=headers, timeout=10)
+        if res.status_code == 200:
+            text = res.text
+            # パターン1: JSON配列内 ["ID", "ファイル名", ...]
+            matches = re.findall(r'\["([a-zA-Z0-9_-]{25,})",\s*\[?"([^"]+)"', text)
+            for fid, fname in matches:
+                if fname.strip() == TARGET_DOC_NAME:
+                    target_file_id = fid
+                    break
+            
+            # パターン2: HTML属性内
+            if not target_file_id:
+                alt_matches = re.findall(r'data-id="([a-zA-Z0-9_-]{25,})"[^>]*aria-label="([^"]+)"', text)
+                for fid, fname in alt_matches:
+                    if fname.strip() == TARGET_DOC_NAME:
+                        target_file_id = fid
+                        break
+
+        if target_file_id:
+            break
+    except Exception as e:
+        print(f"検索試行エラー ({f_url}): {e}")
 
 source_content = "本日の学習記録はありません。"
 
 if target_file_id:
+    print(f"最新の「{TARGET_DOC_NAME}」を検出しました (ID: {target_file_id})")
     export_url = f"https://docs.google.com/document/d/{target_file_id}/export?format=txt"
-    doc_res = requests.get(export_url)
-    if doc_res.status_code == 200:
-        source_content = doc_res.text
-        print(f"ドキュメント本文の取得に成功しました（{len(source_content)} 文字）")
-    else:
-        print(f"ドキュメントのダウンロードに失敗しました (Status: {doc_res.status_code})")
+    try:
+        doc_res = requests.get(export_url, timeout=10)
+        if doc_res.status_code == 200:
+            source_content = doc_res.text
+            print(f"ドキュメント本文の取得に成功しました（{len(source_content)} 文字）")
+        else:
+            print(f"ドキュメント本文の取得に失敗しました (Status: {doc_res.status_code})")
+    except Exception as e:
+        print(f"ドキュメントダウンロードエラー: {e}")
 else:
-    print("有効なドキュメントが見つからなかったため、おさらいモードで動作します。")
+    print("完全一致する「製図 音声解説ソース」が検出されなかったため、おさらいモードで動作します。")
 
-# 3. 指定プロンプトでGeminiに台本生成を依頼
+# 3. 指定プロンプトでGeminiに台本生成を依頼（503エラー対策のリトライ付き）
 prompt = f"""
 あなたは一級建築士 設計製図試験の講師です。以下の「製図 音声解説ソース」をもとに、音声解説（Audio Overview）台本を作成してください。
 
@@ -93,11 +112,23 @@ prompt = f"""
 """
 
 print("② Geminiが台本を作成中...")
-response = client.models.generate_content(
-    model="gemini-3.8-flash",
-    contents=prompt,
-    config={"response_mime_type": "application/json"}
-)
+
+# 混雑時（503）などの自動リトライ処理（最大3回）
+response = None
+for attempt in range(1, 4):
+    try:
+        response = client.models.generate_content(
+            model="gemini-3.8-flash",
+            contents=prompt,
+            config={"response_mime_type": "application/json"}
+        )
+        break
+    except Exception as err:
+        print(f"Geminiリクエスト試行 {attempt}/3 失敗: {err}")
+        if attempt < 3:
+            time.sleep(5 * attempt)
+        else:
+            raise err
 
 dialogue = json.loads(response.text)
 print(f"台本が完成しました（全{len(dialogue)}セリフ）")
