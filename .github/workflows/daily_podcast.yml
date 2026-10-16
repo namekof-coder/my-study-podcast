@@ -1,0 +1,41 @@
+name: Generate Daily Podcast
+
+on:
+  schedule:
+    # 毎日 日本時間 午前6:00 (UTC 21:00) に自動実行
+    - cron: '0 21 * * *'
+  workflow_dispatch: # ボタンを押して手動でいつでも実行できるトリガー
+
+permissions:
+  contents: write # 更新した音声やXMLを保存するために必要
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: Python環境のセットアップ
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: ffmpegとライブラリのインストール
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          pip install google-genai gTTS pydub
+
+      - name: 音声解説とXMLの自動生成
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python generate_daily.py
+
+      - name: 生成結果をGitHubに自動保存（コミット＆プッシュ）
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add daily_overview.mp3 podcast.xml
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update daily podcast for $(date +'%Y-%m-%d')" && git push)
