@@ -13,15 +13,13 @@
     <itunes:category text="Education"/>
     <itunes:image href="https://raw.githubusercontent.com/namekof-coder/my-study-podcast/main/cover.png"/>
 
-    <!-- 最新エピソード -->
     <item>
-      <title>【設備】受水槽の六面点検と断面計画</title>
-      <itunes:title>【設備】受水槽の六面点検と断面計画</itunes:title>
-      <description>受水槽の上部100cm・側面60cmの離隔基準と、梁下有効高さ・機械室断面計画のポイントを解説。</description>
-      <pubDate>Thu, 15 Oct 2026 07:00:00 +0900</pubDate>
-      <enclosure url="https://namekof-coder.github.io/my-study-podcast/daily_overview.wav" type="audio/x-wav" length="10240000"/>
-      <guid isPermaLink="false">episode-2026-10-15</guid>
-      <itunes:duration>180</itunes:duration>
+      <title>【2026-10-16】一級建築士製図 デイリー音声解説</title>
+      <itunes:title>【2026-10-16】一級建築士製図 デイリー音声解説</itunes:title>
+      <description>Googleドキュメントの最新記録に基づく本日の振り返りと重要復習ポイントです。</description>
+      <pubDate>Sat, 17 Oct 2026 06:20:00 +0900</pubDate>
+      <enclosure url="https://namekof-coder.github.io/my-study-podcast/daily_overview.mp3" type="audio/mpeg" length="1634253"/>
+      <guid isPermaLink="false">episode-2026-10-16</guid>
       <itunes:explicit>no</itunes:explicit>
     </item>
 
