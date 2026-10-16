@@ -1,30 +1,60 @@
 import os
 import json
 import io
+import re
 import datetime
 import requests
 from google import genai
 from gtts import gTTS
 from pydub import AudioSegment
 
-# 1. Geminiクライアントの初期化（GitHub Secretsからキーを取得）
+# 1. 初期化
 api_key = os.environ.get("GEMINI_API_KEY")
 client = genai.Client(api_key=api_key)
 
-# 2. Googleドキュメントの最新内容を自動取得（Web公開テキスト形式）
-DOC_ID = "1feUPZWIaEh3wiOn1FolKatyHBDmIXy9wKmqPU0yilaI"
-DOC_EXPORT_URL = f"https://docs.google.com/document/d/{DOC_ID}/export?format=txt"
+# 2. 対象フォルダ内の「製図 音声解説ソース」を自動検索して取得
+FOLDER_ID = "1czW_J-e83J_FdorXYqyCJsjYuKNxD8cl"
+TARGET_DOC_NAME = "製図 音声解説ソース"
 
-print("① Googleドキュメントから最新の学習記録を取得中...")
-res_doc = requests.get(DOC_EXPORT_URL)
-if res_doc.status_code == 200:
-    source_content = res_doc.text
-    print(f"取得成功（{len(source_content)} 文字）")
+print(f"① Googleドライブのフォルダ内を検索中...")
+folder_url = f"https://drive.google.com/embeddedfolderview?id={FOLDER_ID}#list"
+
+target_file_id = None
+try:
+    res = requests.get(folder_url)
+    if res.status_code == 200:
+        # フォルダ内HTMLから「製図 音声解説ソース」のIDを抽出
+        # 形式例: ['ID', '製図 音声解説ソース']
+        pattern = rf'\["([a-zA-Z0-9_-]{{25,}})",\s*"{re.escape(TARGET_DOC_NAME)}"'
+        match = re.search(pattern, res.text)
+        if match:
+            target_file_id = match.group(1)
+            print(f"最新の「{TARGET_DOC_NAME}」を検出しました。")
+        else:
+            print(f"完全一致する「{TARGET_DOC_NAME}」が見つかりませんでした。旧版と区別して再検索します。")
+            # 汎用検索：title属性やリンクから抽出
+            alt_pattern = rf'/document/d/([a-zA-Z0-9_-]+)/edit[^>]*>{re.escape(TARGET_DOC_NAME)}<'
+            alt_match = re.search(alt_pattern, res.text)
+            if alt_match:
+                target_file_id = alt_match.group(1)
+                print(f"最新の「{TARGET_DOC_NAME}」を検出しました。")
+except Exception as e:
+    print(f"フォルダ検索エラー: {e}")
+
+source_content = "本日の学習記録はありません。"
+
+if target_file_id:
+    export_url = f"https://docs.google.com/document/d/{target_file_id}/export?format=txt"
+    doc_res = requests.get(export_url)
+    if doc_res.status_code == 200:
+        source_content = doc_res.text
+        print(f"ドキュメント本文の取得に成功しました（{len(source_content)} 文字）")
+    else:
+        print(f"ドキュメントのダウンロードに失敗しました (Status: {doc_res.status_code})")
 else:
-    print(f"ドキュメント取得に失敗しました (Status: {res_doc.status_code})。フォールバックします。")
-    source_content = "本日の学習記録はありません。"
+    print("有効なドキュメントが見つからなかったため、おさらいモードで動作します。")
 
-# 3. 指定のプロンプトでGeminiに台本を依頼
+# 3. 指定プロンプトでGeminiに台本生成を依頼
 prompt = f"""
 あなたは一級建築士 設計製図試験の講師です。以下の「製図 音声解説ソース」をもとに、音声解説（Audio Overview）台本を作成してください。
 
@@ -70,42 +100,4 @@ print("② Geminiが台本を作成中...")
 response = client.models.generate_content(
     model="gemini-3.8-flash",
     contents=prompt,
-    config={"response_mime_type": "application/json"}
-)
-
-dialogue = json.loads(response.text)
-print(f"台本が完成しました（全{len(dialogue)}セリフ）")
-
-# 4. 音声合成と結合
-print("③ クラウド音声合成中...")
-combined_audio = AudioSegment.empty()
-pause = AudioSegment.silent(duration=350)
-
-for i, item in enumerate(dialogue):
-    speaker = item["speaker"]
-    text = item["text"]
-    
-    # 講師と受講生でアクセント・ドメインを切り替えて声色を分ける
-    tld = "co.jp" if speaker == "Koushi" else "com"
-    tts = gTTS(text=text, lang="ja", tld=tld)
-    
-    fp = io.BytesIO()
-    tts.write_to_fp(fp)
-    fp.seek(0)
-    
-    segment = AudioSegment.from_file(fp, format="mp3")
-    combined_audio += segment + pause
-
-output_audio = "daily_overview.mp3"
-combined_audio.export(output_audio, format="mp3")
-file_size = os.path.getsize(output_audio)
-print(f"音声ファイル保存完了: {output_audio} ({file_size} bytes)")
-
-# 5. podcast.xml の自動更新
-print("④ podcast.xml を更新中...")
-today_str = datetime.date.today().strftime("%Y-%m-%d")
-now_rfc = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9))).strftime("%a, %d %b %Y %H:%M:%S +0900")
-
-xml_content = f"""<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" 
-     xmlns:itunes="
+    config={"response_mime_type": "application/json
