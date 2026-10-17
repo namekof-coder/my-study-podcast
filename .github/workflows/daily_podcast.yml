@@ -2,8 +2,8 @@ name: Generate Daily Podcast
 
 on:
   schedule:
-    # 毎日 日本時間 午前6:00 (UTC 21:00) に自動実行
-    - cron: '0 21 * * *'
+    # 毎日 日本時間 午後4:00 (UTC 07:00) に自動実行
+    - cron: '0 7 * * *'
   workflow_dispatch: # ボタンを押して手動でいつでも実行できるトリガー
 
 permissions:
