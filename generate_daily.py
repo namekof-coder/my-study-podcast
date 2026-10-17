@@ -136,7 +136,18 @@ print(f"台本が完成しました（全{len(dialogue)}セリフ）")
 # 4. 音声合成と結合
 print("③ クラウド音声合成中...")
 combined_audio = AudioSegment.empty()
-pause = AudioSegment.silent(duration=350)
+pause = AudioSegment.silent(duration=250)  # セリフ間の間隔を少し短縮（0.35秒 -> 0.25秒）
+
+# 再生速度変更用の関数（音程を保ったままテンポを速める）
+SPEED_FACTOR = 1.2  # ★お好みの倍率に調整（例: 1.15 〜 1.25倍速）
+
+def change_playback_speed(sound, speed=1.0):
+    # サンプリングレートを変更して速度を変えた後、元のレートに戻すことでテンポを変更
+    sound_with_altered_frame_rate = sound._spawn(
+        sound.raw_data, 
+        overrides={"frame_rate": int(sound.frame_rate * speed)}
+    )
+    return sound_with_altered_frame_rate.set_frame_rate(sound.frame_rate)
 
 for i, item in enumerate(dialogue):
     speaker = item["speaker"]
@@ -150,7 +161,14 @@ for i, item in enumerate(dialogue):
     fp.seek(0)
     
     segment = AudioSegment.from_file(fp, format="mp3")
-    combined_audio += segment + pause
+    # 各セリフを少し早口にする
+    sped_up_segment = change_playback_speed(segment, SPEED_FACTOR)
+    combined_audio += sped_up_segment + pause
+
+output_audio = "daily_overview.mp3"
+combined_audio.export(output_audio, format="mp3")
+file_size = os.path.getsize(output_audio)
+print(f"音声ファイル保存完了: {output_audio} ({file_size} bytes)")
 
 output_audio = "daily_overview.mp3"
 combined_audio.export(output_audio, format="mp3")
